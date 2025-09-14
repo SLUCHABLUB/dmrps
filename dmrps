@@ -8,6 +8,10 @@ declare -r target_directory="${DMRPS_TARGET_DIRECTORY:-"$dmrps_directory/root"}"
 declare -r downloads_directory="$dmrps_directory/downloads"
 declare -r packages_directory="$dmrps_directory/packages"
 
+# the operation to perform on the next specified package
+declare operation
+# the number of times the current operation has been performed
+declare operation_count
 # set if info should be suppressed
 declare quiet
 
@@ -264,12 +268,20 @@ uninstall_self() {
     rm -f "$executable_path"
 }
 
-flag_to_operation() {
+process_flag() {
     local flag="$1"
 
     case "$flag" in
         'download' | 'install' | 'stow' | 'undownload' | 'uninstall' | 'unstow')
-            printf '%s\n' "$package"
+            local new_operation="$flag"
+
+            if [ -z "$operation_count" ] && (( "$operation_count" < 1 ))
+            then
+                warn "operation '$operation' was overritten by '$new_operation' before any packages wre operated on"
+            fi
+
+            operation="$flag"
+            operation_count=0
         ;;
         'export-environment')
             export_environment
@@ -283,15 +295,15 @@ flag_to_operation() {
     esac
 }
 
-short_flag_to_operation() {
+process_short_flag() {
     local flag="$1"
 
     case "$flag" in
         'I')
-            flag_to_operation 'install'
+            process_flag 'install'
         ;;
         'U')
-            flag_to_operation 'uninstall'
+            process_flag 'uninstall'
         ;;
         'E')
             export_environment
@@ -313,26 +325,18 @@ make_directories() {
 main() {
     make_directories
 
-    local operation
-
     for argument in "$@"
     do
         if [[ "$argument" == --* ]]
         then
             local flag="${argument##--}"
 
-            local new_operation
-            new_operation="$(flag_to_operation "$flag")"
-
-            operation="${new_operation:-"$operation"}"
+            process_flag "$flag"
         elif [[ "$argument" == -* ]]
         then
             local flag="${argument##-}"
 
-            local new_operation
-            new_operation="$(short_flag_to_operation "$flag")"
-
-            operation="${new_operation:-"$operation"}"
+            process_short_flag "$flag"
         else
             local package="$argument"
             operate "$operation" "$package"
