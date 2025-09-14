@@ -248,7 +248,7 @@ export_environment() {
 uninstall_self() {
     for package in "$packages_directory"/*
     do
-        ununstall_package "$package"
+        uninstall_package "$package"
     done
 
     rm -f "$executable_path"
