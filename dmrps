@@ -266,8 +266,11 @@ flag_to_operation() {
         'export-environment')
             export_environment
         ;;
+        'uninstall-self')
+            uninstall_self
+        ;;
         *)
-            error "unrecognised flag: '--$operation'"
+            error "unrecognised flag: '--$flag'"
         ;;
     esac
 }
@@ -286,7 +289,7 @@ short_flag_to_operation() {
             export_environment
         ;;
         *)
-            error "unrecognised flag: '-$operation'"
+            error "unrecognised flag: '-$flag'"
         ;;
     esac
 }
