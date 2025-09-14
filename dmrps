@@ -238,8 +238,8 @@ export_environment() {
         local variable="$1"
         local paths=("${@:2}")
 
-        configuration+="export PATH="
-        configuration+='"'
+        configuration+="export $variable"
+        configuration+='="'
 
         for path in "${paths[@]}"
         do
