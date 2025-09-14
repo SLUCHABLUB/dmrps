@@ -184,7 +184,10 @@ unstow_package() {
 
     check_stow
 
-    error "TODO: unstow packge"
+    stow \
+        --target="$target_directory" \
+        --dir="$packages_directory" \
+        --delete "$package"
 }
 
 # performs an operation on a package
