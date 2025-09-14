@@ -275,7 +275,7 @@ process_flag() {
         'download' | 'install' | 'stow' | 'undownload' | 'uninstall' | 'unstow')
             local new_operation="$flag"
 
-            if [ -z "$operation_count" ] && (( "$operation_count" < 1 ))
+            if [ -n "$operation_count" ] && (( "$operation_count" < 1 ))
             then
                 warn "operation '$operation' was overritten by '$new_operation' before any packages wre operated on"
             fi
