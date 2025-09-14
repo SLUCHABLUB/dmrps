@@ -313,8 +313,6 @@ make_directories() {
 main() {
     make_directories
 
-    check_dependencies
-
     local operation
 
     for argument in "$@"
