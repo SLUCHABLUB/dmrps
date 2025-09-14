@@ -223,8 +223,8 @@ export_environment() {
 
     local -a binary_paths=(
         "$root/usr/local/bin"
-        "$root/usr/local/bin"
-        "$root/usr/local/bin"
+        "$root/usr/bin"
+        "$root/bin"
     )
     local -a library_paths=(
         "$root/usr/lib"
