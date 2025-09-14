@@ -99,11 +99,13 @@ install_stow() {
             --restow 'stow'
 }
 
-check_dependencies() {
+check_stow() {
+   command -v stow > /dev/null || try_install_stow
+}
+
+check_debian() {
     command -v apt-get > /dev/null || error "could not find apt-get"
     command -v dpkg    > /dev/null || error "could not find dpkg"
-
-    command -v stow    > /dev/null || try_install_stow
 }
 
 clean_downloads_directory() {
@@ -115,6 +117,8 @@ download_package() {
     local package="$1"
 
     info "downloading '$package' to $packages_directory"
+
+    check_debian
 
     warn "not downloading dependencies (TODO)"
 
@@ -140,6 +144,8 @@ stow_package() {
     local package="$1"
 
     info "stowing '$package' in $target_directory"
+
+    check_stow
 
     stow \
         --target="$target_directory" \
@@ -169,6 +175,10 @@ unstow_package() {
     local package="$1"
 
     info "removing '$package' from $target_directory"
+
+    check_stow
+
+    error "TODO: unstow packge"
 }
 
 # performs an operation on a package
