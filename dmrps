@@ -101,6 +101,8 @@ install_stow() {
             --target="$target_directory" \
             --dir="$packages_directory" \
             --restow 'stow'
+
+    PATH="$target_directory/usr/bin:$PATH"
 }
 
 check_stow() {
