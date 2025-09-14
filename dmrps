@@ -1,0 +1,334 @@
+#!/bin/env bash
+
+declare -r executable_path="$0"
+
+declare -r dmrps_directory="${DMRPS_DIRECTORY:-"$HOME/.dmrps"}"
+declare -r target_directory="${DMRPS_TARGET_DIRECTORY:-"$dmrps_directory/root"}"
+
+declare -r downloads_directory="$dmrps_directory/downloads"
+declare -r packages_directory="$dmrps_directory/packages"
+
+# set if info should be suppressed
+declare quiet
+
+error() {
+    printf '%s\n' "[ERROR]: $1" >&2
+    exit 1
+}
+
+warn() {
+    printf '%s\n' "[WARNING]: $1" >&2
+}
+
+info() {
+    if [ -z "$quiet" ]
+    then
+        printf '%s\n' "$1" >&2
+    fi
+}
+
+input() {
+    local prompt="$1"
+
+    printf '%s ' "$prompt" >&2
+    read -r
+}
+
+input_polar() {
+    local prompt="$1"
+    local default="$2"
+
+    local default_status
+
+    if [ "$default" = 'y' ]
+    then
+        prompt="$prompt [Y/n]"
+        default_status=0
+    elif [ "$default" = 'n' ]
+    then
+        prompt="$prompt [y/N]"
+        default_status=1
+    else
+        error "invalid default '$default' for '$0'"
+    fi
+
+    local -l answer
+    answer=$(input "$prompt")
+
+    if [ "$answer" = 'y' ]
+    then
+        return 0
+    elif [[ "$answer" == y* ]]
+    then
+        warn "interpreting '$answer' as 'y'"
+        return 0
+    elif [ "$answer" = 'n' ]
+    then
+        return 1
+    elif [[ "$answer" == n* ]]
+    then
+        warn "interpreting '$answer' as 'n'"
+        return 1
+    elif [ "$answer" = '' ]
+    then
+        return "$default_status"
+    else
+        error "could not interpret '$answer' as 'y' or 'n'"
+    fi
+}
+
+try_install_stow() {
+    warn "could not find stow"
+
+    if input_polar "do you wish to install stow?" 'y'
+    then
+        install_stow
+    else
+        info "exiting"
+        exit 1
+    fi
+}
+
+install_stow() {
+    download_package 'stow'
+
+    PERL5LIB="$packages_directory/stow/usr/share/perl5" \
+        "$packages_directory/stow/usr/bin/stow" \
+            --target="$target_directory" \
+            --dir="$packages_directory" \
+            --restow 'stow'
+}
+
+check_dependencies() {
+    command -v apt-get > /dev/null || error "could not find apt-get"
+    command -v dpkg    > /dev/null || error "could not find dpkg"
+
+    command -v stow    > /dev/null || try_install_stow
+}
+
+clean_downloads_directory() {
+    rm -f "$downloads_directory"/*
+}
+
+# downloads and extract the package into the package directory
+download_package() {
+    local package="$1"
+
+    info "downloading '$package' to $packages_directory"
+
+    warn "not downloading dependencies (TODO)"
+
+    pushd "$downloads_directory" >/dev/null || error "unable to push directory to the stack"
+
+    apt-get download "$package"
+
+    popd >/dev/null || error "unable to pop directory from the stack"
+
+    dpkg -x "$downloads_directory/$package"*.deb "$packages_directory/$package"
+
+    clean_downloads_directory
+}
+
+# (re-)installs the package
+install_package() {
+    local package="$1"
+
+    download_package "$package"
+    stow_package "$package"
+}
+
+# (re-)"installs" the package (provided it is in the package directory)
+stow_package() {
+    local package="$1"
+
+    info "stowing '$package' in $target_directory"
+
+    stow \
+        --target="$target_directory" \
+        --dir="$packages_directory" \
+        --restow "$package"
+}
+
+# removes a package from the packages directory
+# warning: this may produce broken symlinks in the target directory
+undownload_package() {
+    local package="$1"
+
+    info "removing '$package' from $packages_directory"
+
+    rm -rf "$packages_directory/${package:?}" || error "failed to undownload package '$package'"
+}
+
+unintsall_package() {
+    local package="$1"
+
+    unstow_package "$package"
+    undownload_package "$package"
+}
+
+# uninstalls the package whilst keeping it downloaded
+unstow_package() {
+    local package="$1"
+
+    info "removing '$package' from $target_directory"
+}
+
+# performs an operation on a package
+operate() {
+    local operation="$1"
+    local package="$2"
+
+    case "$operation" in
+        'download')
+            download_package "$package"
+        ;;
+        'install')
+            install_package "$package"
+        ;;
+        'stow')
+            stow_package "$package"
+        ;;
+        'undownload')
+            undownload_package "$package"
+        ;;
+        'uninstall')
+            uninstall_package
+        ;;
+        'unstow')
+            unstow_package "$package"
+        ;;
+        *)
+            error "unrecognised package operation: '$operation'"
+        ;;
+    esac
+}
+
+# exports a non-exhaustive list of directories to various paths; more may be added in the future.
+export_environment() {
+    local root="$target_directory"
+
+    local -a binary_paths=(
+        "$root/usr/local/bin"
+        "$root/usr/local/bin"
+        "$root/usr/local/bin"
+    )
+    local -a library_paths=(
+        "$root/usr/lib"
+        "$root/lib"
+    )
+    local -a perl5_paths=(
+        "$root/usr/share/perl5"
+    )
+
+    local configuration
+
+    export_variable() {
+        local variable="$1"
+        local paths=("${@:2}")
+
+        configuration+="export PATH="
+        configuration+='"'
+
+        for path in "${paths[@]}"
+        do
+            configuration+="${path}:"
+        done
+
+        configuration+='$'
+        configuration+="$variable"
+        configuration+=$'"\n'
+    }
+
+    export_variable 'PATH' "${binary_paths[@]}"
+    export_variable 'LD_LIBRARY_PATH' "${library_paths[@]}"
+    export_variable 'PERL5LIB' "${perl5_paths[@]}"
+
+    printf '%s\n' "$configuration"
+}
+
+# uninstalls dmrps and all packages that it has installed
+uninstall_self() {
+    for package in "$packages_directory"/*
+    do
+        ununstall_package "$package"
+    done
+
+    rm -f "$executable_path"
+}
+
+flag_to_operation() {
+    local flag="$1"
+
+    case "$flag" in
+        'download' | 'install' | 'stow' | 'undownload' | 'uninstall' | 'unstow')
+            printf '%s\n' "$package"
+        ;;
+        'export-environment')
+            export_environment
+        ;;
+        *)
+            error "unrecognised flag: '--$operation'"
+        ;;
+    esac
+}
+
+short_flag_to_operation() {
+    local flag="$1"
+
+    case "$flag" in
+        'I')
+            flag_to_operation 'install'
+        ;;
+        'U')
+            flag_to_operation 'uninstall'
+        ;;
+        'E')
+            export_environment
+        ;;
+        *)
+            error "unrecognised flag: '-$operation'"
+        ;;
+    esac
+}
+
+make_directories() {
+    mkdir -p "$dmrps_directory"
+    mkdir -p "$target_directory"
+
+    mkdir -p "$downloads_directory"
+    mkdir -p "$packages_directory"
+}
+
+main() {
+    make_directories
+
+    check_dependencies
+
+    local operation
+
+    for argument in "$@"
+    do
+        if [[ "$argument" == --* ]]
+        then
+            local flag="${argument##--}"
+
+            local new_operation
+            new_operation="$(flag_to_operation "$flag")"
+
+            operation="${new_operation:-"$operation"}"
+        elif [[ "$argument" == -* ]]
+        then
+            local flag="${argument##-}"
+
+            local new_operation
+            new_operation="$(short_flag_to_operation "$flag")"
+
+            operation="${new_operation:-"$operation"}"
+        else
+            local package="$argument"
+            operate "$operation" "$package"
+        fi
+    done
+}
+
+main "$@"
