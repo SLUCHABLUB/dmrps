@@ -118,13 +118,11 @@ download_package() {
 
     warn "not downloading dependencies (TODO)"
 
-    pushd "$downloads_directory" >/dev/null || error "unable to push directory to the stack"
+    cd "$downloads_directory" || error "unable to push directory to the stack"
 
-    apt-get download "$package"
+    apt-get download "$package" || error "unable to download package"
 
-    popd >/dev/null || error "unable to pop directory from the stack"
-
-    dpkg -x "$downloads_directory/$package"*.deb "$packages_directory/$package"
+    dpkg -x "$downloads_directory/$package"*.deb "$packages_directory/$package" || error "uable to extract package"
 
     clean_downloads_directory
 }
