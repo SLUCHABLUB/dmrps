@@ -90,19 +90,14 @@ try_install_stow() {
 
     if input_polar "do you wish to install stow?" 'y'
     then
-        install_stow
+        PERL5LIB="$packages_directory/stow/usr/share/perl5"
+        PATH="$packages_directory/stow/usr/bin:$PATH"
+
+        install_package 'stow'
     else
         info "exiting"
         exit 1
     fi
-}
-
-install_stow() {
-    download_package 'stow'
-
-    PERL5LIB="$packages_directory/stow/usr/share/perl5"
-
-    PATH="$packages_directory/stow/usr/bin:$PATH"
 }
 
 check_stow() {
