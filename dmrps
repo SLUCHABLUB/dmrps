@@ -15,6 +15,10 @@ declare operation_count
 # set if info should be suppressed
 declare quiet
 
+# theese are used if we install stow
+export PATH
+export PERL5LIB
+
 error() {
     printf '%s\n' "[ERROR]: $1" >&2
     exit 1
@@ -96,13 +100,9 @@ try_install_stow() {
 install_stow() {
     download_package 'stow'
 
-    PERL5LIB="$packages_directory/stow/usr/share/perl5" \
-        "$packages_directory/stow/usr/bin/stow" \
-            --target="$target_directory" \
-            --dir="$packages_directory" \
-            --restow 'stow'
+    PERL5LIB="$packages_directory/stow/usr/share/perl5"
 
-    PATH="$target_directory/usr/bin:$PATH"
+    PATH="$packages_directory/stow/usr/bin:$PATH"
 }
 
 check_stow() {
